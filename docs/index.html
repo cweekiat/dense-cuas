@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>PropPulse</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Can an event camera spot small drones better than a normal camera with AI? A paired study on real data, explained for students.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column (~68ch) with full-bleed figure bands; the sensor's ON/OFF polarity
+   (blue/orange) is the only accent pair, used for event-camera vs normal-camera throughout. */
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --ink: #12151a;
+  --ink-2: #4a5160;
+  --rule: #dfe3ea;
+  --on: #2a6fd0;        /* ON events  = event camera */
+  --off: #d75a28;       /* OFF events = normal camera (RGB) */
+  --sensor: #0d1117;    /* event-sensor black used behind event imagery */
+  --note-bg: #eef3fb;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1218; --surface: #161b23; --ink: #e8ecf2; --ink-2: #a6afbd; --rule: #2a313d;
+    --on: #5b9bf0; --off: #f08452; --sensor: #05070a; --note-bg: #17202e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1218; --surface: #161b23; --ink: #e8ecf2; --ink-2: #a6afbd; --rule: #2a313d;
+  --on: #5b9bf0; --off: #f08452; --sensor: #05070a; --note-bg: #17202e; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 1.0625rem/1.65 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 3rem;
+}
+.col { max-width: 68ch; margin-inline: auto; }
+.wide { max-width: 1100px; margin-inline: auto; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.45rem, 3.2vw, 1.95rem); font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 1.12rem; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--on); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--on); outline-offset: 2px; }
+.eyebrow { font: 500 0.78rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.on { color: var(--on); } .off { color: var(--off); }
+section { padding-block: 3.2rem 0; }
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* hero */
+header.hero { padding-block: 3.2rem 1rem; }
+.hero .lede { font-size: 1.2rem; color: var(--ink-2); max-width: 60ch; }
+.links { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.chip { font: 500 0.85rem/1 var(--mono); padding: 0.55rem 0.8rem; border: 1px solid var(--rule); border-radius: 999px; color: var(--ink); text-decoration: none; background: var(--surface); }
+.chip[aria-disabled="true"] { color: var(--ink-2); }
+
+/* propeller demo */
+.demo { display: grid; grid-template-columns: minmax(0, 640px); justify-content: start; gap: 1rem; margin-top: 1.6rem; }
+.pane { background: var(--sensor); border-radius: 10px; overflow: hidden; position: relative; min-width: 0; }
+.pane canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; }
+.pane .cap { position: absolute; left: 0.6rem; top: 0.6rem; font: 500 0.78rem/1.3 var(--mono); color: #e8ecf2; background: rgba(8, 11, 16, 0.72); padding: 0.4rem 0.55rem; border-radius: 6px; }
+.pane .cap b { display: block; font-weight: 500; }
+.pane.rgb .cap b { color: #f5a27a; } .pane.ev .cap b { color: #8ab8f5; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1.2rem; margin-top: 0.8rem; font-size: 0.92rem; color: var(--ink-2); }
+.controls input[type="range"] { width: min(260px, 60vw); accent-color: var(--on); }
+.controls button { font: 500 0.85rem/1 var(--mono); padding: 0.5rem 0.8rem; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+.demo-note { margin-top: 0.6rem; font-size: 0.92rem; color: var(--ink-2); }
+
+/* tldr */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 1.3rem 1.4rem; display: grid; gap: 0.7rem; }
+.tldr ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.4rem; }
+
+/* figure bands */
+figure { margin: 0; }
+figure img, figure video { width: 100%; max-width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--rule); background: var(--surface); display: block; }
+figcaption { font-size: 0.88rem; color: var(--ink-2); margin-top: 0.55rem; }
+
+/* steps (a real sequence -> numbered) */
+ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: grid; gap: 0.9rem; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 2.2rem 1fr; gap: 0.8rem; align-items: start; }
+ol.steps li::before { content: counter(s); font: 600 0.95rem/2.2rem var(--mono); text-align: center; width: 2.2rem; height: 2.2rem; border-radius: 50%; background: var(--note-bg); color: var(--on); }
+ol.steps li > div { min-width: 0; }
+
+/* results chart */
+.chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 1.1rem 1.2rem; }
+.bars { display: grid; gap: 1rem; }
+.row { display: grid; grid-template-columns: minmax(7.5rem, 11rem) 1fr; gap: 0.8rem; align-items: center; }
+.row .lbl { font-size: 0.92rem; min-width: 0; }
+.pair { display: grid; gap: 4px; }
+.bar { height: 14px; border-radius: 3px; position: relative; background: var(--note-bg); }
+.bar span { position: absolute; inset: 0 auto 0 0; border-radius: 3px; }
+.bar.e span { background: var(--on); } .bar.r span { background: var(--off); }
+.bar em { position: absolute; left: calc(var(--w) + 6px); top: -3px; font: 500 0.78rem/20px var(--mono); font-style: normal; color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; font-size: 0.85rem; color: var(--ink-2); margin-bottom: 0.9rem; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+
+.note { background: var(--note-bg); border-radius: 10px; padding: 0.9rem 1.1rem; font-size: 0.95rem; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+.grid2 > * { min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--rule); }
+td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; }
+.hz { display: inline-block; height: 8px; background: var(--on); border-radius: 2px; vertical-align: middle; }
+footer { margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); font-size: 0.88rem; color: var(--ink-2); }
+
+@media (max-width: 720px) {
+  .demo, .grid2 { grid-template-columns: 1fr; }
+  .row { grid-template-columns: 1fr; gap: 0.3rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header class="hero">
+  <div class="wide stack" style="gap:1.1rem">
+    <p class="eyebrow">DENSE-CUAS · independent research · event-based vision · drone detection</p>
+    <h1>PropPulse</h1>
+    <p class="lede">Can a camera that only sees <span class="on">change</span> spot small drones in a city better than a normal camera with AI? We tested both on the same real scenes and kept score fairly.</p>
+    <div class="links">
+      <a class="chip" href="#results">Results</a>
+      <a class="chip" href="#video">Watch the demo</a>
+      <a class="chip" href="#scenarios">Scenario comparison</a>
+      <a class="chip" href="#how">How it works</a>
+      <span class="chip" aria-disabled="true">Paper incoming</span>
+      <a class="chip" href="https://github.com/cweekiat/dense-cuas" target="_blank" rel="noopener">Project on GitHub</a>
+    </div>
+
+    <div class="demo" aria-label="Animation of a spinning propeller seen by an event camera">
+      <div class="pane ev"><canvas id="cv-ev" width="480" height="360"></canvas><div class="cap"><b>Event camera</b>only pixels that change report, instantly</div></div>
+    </div>
+    <div class="controls">
+      <label for="rpm">Propeller speed</label>
+      <input id="rpm" type="range" min="20" max="320" value="160" step="10">
+      <span class="mono" id="rpm-out">160 rotations/s</span>
+      <button id="toggle" type="button">Pause</button>
+    </div>
+    <p class="demo-note">Illustration, slowed down 60&times;. The event camera sees every blade edge as it passes: <span class="on">blue</span> pixels got brighter, <span class="off">orange</span> pixels got darker. The blades flicker at <span class="mono" id="bp">320</span>&nbsp;Hz, far faster than a 30 frames/s camera can sample.</p>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="col tldr">
+      <p class="eyebrow">In three sentences</p>
+      <ul>
+        <li>Small drones are hard to see in cities: they are a few pixels wide, fast, and seen against buildings, trees and changing light.</li>
+        <li>An <strong>event camera</strong> ignores everything that is still, and reports brightness changes with microsecond timing, including the flicker of spinning propellers.</li>
+        <li>On 25 real test recordings, our event-based method found 70% of drones against 50% for the best normal-video AI, when both were allowed the same 5% false alarms. The gap was biggest for fast and very small drones, small racing drones, cluttered scenes and at night. Against plain sky and for slow drones the two were level, and at a stricter 1% false-alarm limit neither side won.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="col stack">
+      <p class="eyebrow">The problem</p>
+      <h2>Why a drone is hard to spot</h2>
+      <p>Picture a drone 300&nbsp;m away. With a typical lens it covers about 10 pixels. In one video frame it looks a lot like a window corner, an antenna or a bird. If it moves fast, it smears across the frame. If the sun is behind it, the camera may wash it out completely.</p>
+      <p>Radio detectors help when the drone talks to its controller, but a drone flying a pre-set route can be radio-silent. That leaves cameras as an important layer, so it matters which kind of camera works best.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col stack">
+      <p class="eyebrow">The sensor</p>
+      <h2>What is an event camera?</h2>
+      <p>A normal camera takes a full picture many times a second, whether anything changed or not. An event camera works pixel by pixel. Each pixel watches its own brightness and sends a tiny message, an <em>event</em>, only when that brightness changes by more than a set amount. An event is just four numbers: where (<span class="mono">x, y</span>), when (<span class="mono">t</span>, to the microsecond) and which way (<span class="mono">p</span>, brighter or darker).</p>
+      <p>Three things follow. A wall or a building that does not move sends nothing. A fast object does not blur. A propeller, whose blades sweep past the same pixels hundreds of times a second, makes those pixels flicker at a steady rhythm. That rhythm is a fingerprint birds do not have.</p>
+    </div>
+    <figure class="wide" style="margin-top:1.4rem">
+      <img src="site/assets/fig_d5_examples.jpg" alt="Grid of example images: real drones seen by a normal camera and as events, plus urban scenes" loading="lazy">
+      <figcaption>Real samples from the datasets we used. Each pair shows the same moment from a normal camera and as events (FRED), plus urban photos (DUT Anti-UAV) and very small drones seen as events (EV-UAV). Yellow boxes mark the drone.</figcaption>
+    </figure>
+  </section>
+
+  <section id="how">
+    <div class="col stack">
+      <p class="eyebrow">The method</p>
+      <h2>How PropPulse finds a drone</h2>
+      <ol class="steps">
+        <li><div><h3>Find blobs of activity</h3><p>Every 10&nbsp;ms, count events in small squares of the image and mark busy clusters as candidates. Areas that are always busy, such as trees in the wind, are noted as clutter.</p></div></li>
+        <li><div><h3>Follow each blob</h3><p>Link candidates over time into tracks, so we know how each object moves. Every track also carries its own small bank of spiking &ldquo;tuning-fork&rdquo; neurons that react to each incoming event (see below).</p></div></li>
+        <li><div><h3>Hold the drone still, then listen for the propeller</h3><p>Shift the events to cancel the drone's own motion, as if a camera were following it. Then count events in tiny cells 4,000 times a second and look for a steady rhythm between 70 and 1,000&nbsp;Hz, plus its multiples. Fake rhythms caused by fast motion across the pixel grid, and flickering lamps or LED signs, are removed.</p></div></li>
+        <li><div><h3>Ask a trained checker</h3><p>Combine the rhythm and the neurons' responses with simple facts about the track (speed, how smooth its path is, how unusual it is for that spot) and let a small trained model decide: drone or not. Simple rules then drop shadows and duplicate tracks of the same drone.</p></div></li>
+      </ol>
+    </div>
+    <figure class="wide" style="margin-top:1.4rem">
+      <img src="site/assets/figM2_propeller_pulse.jpg" alt="Six-panel figure showing the method steps on real data from a DJI Tello" loading="lazy">
+      <figcaption>The steps on real data (DJI Tello, FRED test sequence 139). (b) Raw events slide as the drone moves. (c) After motion compensation the drone's parts stay in place. (d) Single cells flicker periodically. (e) The averaged spectrum and the harmonic comb; grey bands are frequencies excluded as motion artefacts. (f) The decision.</figcaption>
+    </figure>
+    <div class="col stack" style="margin-top:1.4rem">
+      <p>We also trained a standard AI detector (<span class="mono">YOLO11n</span>) on "event images": each 33&nbsp;ms of events is drawn as a three-channel picture showing brighter changes, darker changes, and how recently each pixel fired.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col stack">
+      <p class="eyebrow">Keeping score</p>
+      <h2>A fair race: same scenes, same false-alarm rate</h2>
+      <p>Comparing detectors is easy to get wrong. A detector that shouts "drone!" at everything will find every drone, and also every bird and window. So we fix how often each method is allowed to raise a false alarm (1% or 5% of 0.2-second time slots) and then ask how many real drones it finds. We call that the <strong>detection rate</strong>.</p>
+      <p>We use FRED, a public dataset recorded with an event camera and a normal camera side by side, so both methods see exactly the same scenes. To mimic drones farther away, we also shrink the images by 2&times; and 4&times;.</p>
+    </div>
+    <figure class="wide" style="margin-top:1.2rem">
+      <img src="site/assets/figM4_protocol.jpg" alt="Diagram of time bins with hits and false alarms, and curves of detection rate against false-alarm rate" loading="lazy">
+      <figcaption>Left: dots are detections on the drone, crosses are false alarms. Right: each method gets its own threshold so that both make the same number of false alarms; only then are detection rates compared.</figcaption>
+    </figure>
+  </section>
+
+  <section id="results">
+    <div class="col stack">
+      <p class="eyebrow">Results</p>
+      <h2>Where events help, and where they don't</h2>
+      <div class="note"><strong>Final round: 25 test recordings.</strong> Each bar compares the event method with the <em>better</em> of two normal-camera AIs (a 3-frame network and YOLO11n) in that situation. Overall, the event method found 20 percentage points more drones than the best normal-camera AI. If the experiment were repeated on other recordings, that gap would very likely stay positive: the 95% range is +12 to +28 points.</div>
+      <div class="chart" role="img" aria-label="Detection rate at 5 percent false alarms: event method versus normal-camera AI, by situation">
+        <div class="legend"><span><i style="background:var(--on)"></i>Event camera + PropPulse</span><span><i style="background:var(--off)"></i>Normal camera + best AI</span><span>Detection rate at 5% false alarms</span></div>
+        <div class="bars" id="bars"></div>
+      </div>
+      <p>Events win where normal cameras struggle: fast motion (no blur), tiny drones, cluttered scenes with trees and ground, and darkness. Against plain sky a drone is easy to see in a normal photo, and there the two were level. Slow drones were also a draw. When we made false alarms rarer (1% instead of 5%), no method was clearly ahead. A real system would likely use both cameras.</p>
+      <p>A surprise: feeding events to a standard AI detector as pictures (event YOLO11n) did <em>not</em> beat the same detector on normal video (49% vs 44%, within chance). It was especially poor for tiny, distant drones. How you process events matters as much as the camera.</p>
+      <p>One more honest finding: most of the event method's advantage comes from how cleanly events show <em>moving</em> things against still clutter. The propeller rhythm helps, but it is the second clue, not the first.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col stack">
+      <p class="eyebrow">A bonus</p>
+      <h2>Propellers have fingerprints</h2>
+      <p>The event camera measured a blade-pass frequency for each drone. The bigger DJI propellers spin slower than the small racing-drone propellers, so the frequency hints at the drone's size, from a single passive camera. One racing drone (Cineape20) varied a lot (about 200 to 850&nbsp;Hz) as it changed throttle.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Drone</th><th class="num">Blade-pass (median)</th><th></th></tr></thead>
+          <tbody id="hz-rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="video">
+    <div class="col stack">
+      <p class="eyebrow">See it on real data</p>
+      <h2>Demo: the same moments through both cameras</h2>
+      <p>Left: RGB video with a trained AI detector (U-Net). Right: the event stream with PropPulse. Green boxes are the true drone, red boxes are detections, and white marks a false alarm. The strip at the bottom shows when each method fired. The video walks through fast drones, buildings, tree clutter, night and emulated long range, and ends with a case where the normal camera wins.</p>
+    </div>
+    <figure class="wide" style="margin-top:1.2rem">
+      <video controls preload="metadata" playsinline poster="site/assets/demo_poster.jpg">
+        <source src="site/assets/scenario_demo.mp4" type="video/mp4">
+        Your browser cannot play this video here. <a href="site/assets/scenario_demo.mp4">Open the video file</a>.
+      </video>
+      <figcaption>Held-out test recordings from FRED, played back in real time (detections computed offline). Both methods use thresholds set for the same 5% false-alarm rate. Clips were chosen to illustrate each scenario; the overall numbers are in the results above. If the player does not load, <a href="site/assets/scenario_demo.mp4">open the video file</a>.</figcaption>
+    </figure>
+  </section>
+
+  <section id="scenarios">
+    <div class="col stack">
+      <p class="eyebrow">Scenario by scenario</p>
+      <h2>Where each camera is better</h2>
+      <p>Each dot pair compares the event camera with the <em>better</em> of two RGB detectors in one situation, over all 25 test recordings. The map below breaks the difference down by how fast and how big the drone appears: blue means events detect more, orange means RGB does.</p>
+    </div>
+    <figure class="wide" style="margin-top:1.2rem">
+      <img src="site/assets/fig10_scenarios.jpg" alt="Detection rate by scenario: event camera with PropPulse versus best RGB detector" loading="lazy">
+      <figcaption>Detection rate at 5% false alarms. Events lead for fast, tiny, long-range, cluttered and night scenes; slow drones and plain sky are a draw.</figcaption>
+    </figure>
+    <div class="wide grid2" style="margin-top:1.2rem">
+      <figure><img src="site/assets/fig11_advantage_map.jpg" alt="Map of event minus RGB detection rate by speed and size" loading="lazy"><figcaption>Event minus best-RGB detection rate, by drone speed and size.</figcaption></figure>
+      <figure><img src="site/assets/stills_montage.jpg" alt="RGB and event views of the same moment in each scenario" loading="lazy"><figcaption>The same moment through both cameras, one row per scenario.</figcaption></figure>
+    </div>
+    <div class="wide grid2" style="margin-top:1.2rem">
+      <figure><img src="site/assets/gifs/fast.gif" alt="Fast FPV drone: RGB versus events" loading="lazy"><figcaption>Fast FPV drone</figcaption></figure>
+      <figure><img src="site/assets/gifs/clutter.gif" alt="Drone against trees: RGB versus events" loading="lazy"><figcaption>Trees and ground clutter</figcaption></figure>
+      <figure><img src="site/assets/gifs/night.gif" alt="Drone at night: RGB versus events" loading="lazy"><figcaption>Night</figcaption></figure>
+      <figure><img src="site/assets/gifs/range4.gif" alt="Drone at emulated 4x range: RGB versus events" loading="lazy"><figcaption>Long range (emulated 4&times;)</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <div class="col stack">
+      <p class="eyebrow">Spiking neurons</p>
+      <h2>Listening for propellers with spiking neurons</h2>
+      <p>Our rhythm check waits for a quarter of a second of data and then runs a frequency analysis. Brains do it differently. A <em>resonate-and-fire</em> neuron behaves like a tuning fork: every event gives it a small push, and only the neuron tuned to the propeller's rhythm builds up enough to fire.</p>
+      <p>On 71,000 real track windows, a bank of 48 such neurons told drones from clutter about as well as the frequency analysis (score 0.68 vs 0.69), and better when the two were combined (0.76). On drones it fired after a median of <span class="mono">37&nbsp;ms</span>, compared with <span class="mono">210&nbsp;ms</span> for the frequency analysis, and used about <span class="mono">19&times;</span> fewer operations. It also fires on 40% of non-drone windows, so a spike is a hint, not a verdict. In the final detector every track runs such a bank on every event, and its responses help the trained checker decide. Operation counts are estimates; energy was not measured.</p>
+    </div>
+    <figure class="wide" style="margin-top:1.2rem">
+      <img src="site/assets/figM3_repr_and_rf.jpg" alt="Event image channels and traces of two resonate-and-fire neurons" loading="lazy">
+      <figcaption>Top: how events become a three-channel image for the AI detector. Bottom: the neuron tuned near the propeller frequency builds up and crosses its threshold; an off-tune neuron does not.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="col stack">
+      <p class="eyebrow">Being clear about limits</p>
+      <h2>Limits of this study</h2>
+      <div class="grid2">
+        <div class="stack" style="gap:0.5rem"><h3>Speed and power</h3><p>Our event method spots 62% of drones within a quarter of a second, more than the normal-camera YOLO (50%), but its median time to first detection (0.12&nbsp;s) is still slower than YOLO's single frame (0.03&nbsp;s), because weaker tracks wait for the rhythm to be measured. On one laptop CPU core it needs 0.1&nbsp;s of processing per second of a typical recording; a scene where most of the image sways with the camera mount is still about 5&times; slower than real time. Low power is only estimated, not measured on real chips. And a 5% false-alarm rate is far too high for a real deployment: these results rank approaches, they are not a finished system.</p></div>
+        <div class="stack" style="gap:0.5rem"><h3>Real cities</h3><p>Paired data comes from one dataset, one city and five drone models, with a fixed camera. Moving or vibrating cameras, traffic, LED billboards and long drone-free recordings were not tested. "Distance" is imitated by shrinking images, which flatters the event method; only two test recordings were at night.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="col stack">
+      <p class="eyebrow">Data</p>
+      <h2>Datasets used</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Dataset</th><th>What it contains</th><th>Our use</th></tr></thead>
+          <tbody>
+            <tr><td><a href="https://miccunifi.github.io/FRED/" target="_blank" rel="noopener">FRED</a></td><td>Event camera + normal camera side by side, 5 drone models, 1280&times;720</td><td>Main, fair comparison (75 recordings)</td></tr>
+            <tr><td><a href="https://github.com/wangdongdut/DUT-Anti-UAV" target="_blank" rel="noopener">DUT Anti-UAV</a></td><td>Normal-camera photos of drones, many urban scenes</td><td>Extra training and an urban test for normal cameras</td></tr>
+            <tr><td><a href="https://github.com/ChenYichen9527/Ev-UAV" target="_blank" rel="noopener">EV-UAV</a></td><td>Event recordings of very small drones (about 7 pixels)</td><td>Extra training and an urban test for event cameras</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Thanks to the authors of these datasets, and to EventRadar, EvDetMAV and EVPropNet, whose work on propeller sensing this project builds on.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="col">PropPulse · DENSE-CUAS independent research · results of the October 2026 evaluation; further testing in progress.<br>Text, figures and video &copy; 2026 the author, licensed <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank" rel="noopener">CC BY-NC-ND 4.0</a> (non-commercial, no derivatives). Source code, trained models and processed data are not public. Dataset imagery: FRED and DUT Anti-UAV (Apache-2.0) and EV-UAV, credited to their authors.</div>
+</footer>
+
+<script>
+(() => {
+  // ---------- results bars (frozen split, 25 FRED test sequences, P_D at 5% FA; RGB = better of U-Net / YOLO11n) ----------
+  const rows = [
+    ["All drones", 0.70, 0.50],
+    ["Fast drones (≥300 px/s)", 0.82, 0.38],
+    ["Tiny drones (under 8 px)", 0.54, 0.32],
+    ["Trees, ground, glare", 0.71, 0.38],
+    ["Against buildings", 0.66, 0.50],
+    ["At night (2 recordings)", 0.65, 0.38],
+    ["Slow drones (<100 px/s)", 0.57, 0.53],
+    ["Against plain sky", 0.75, 0.75],
+  ];
+  const bars = document.getElementById("bars");
+  for (const [label, e, r] of rows) {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<div class="lbl">${label}</div><div class="pair">
+      <div class="bar e" style="--w:${e * 100}%"><span style="width:${e * 100}%"></span><em>${e.toFixed(2)}</em></div>
+      <div class="bar r" style="--w:${r * 100}%"><span style="width:${r * 100}%"></span><em>${r.toFixed(2)}</em></div></div>`;
+    bars.appendChild(row);
+  }
+  // ---------- propeller fingerprints ----------
+  const hz = [["DJI Mini 3", 223], ["DJI Mini 2", 316], ["DJI Tello EDU", 539], ["DarwinFPV Cineape20 (varies)", 547], ["BetaFPV Air75", 738]];
+  const tb = document.getElementById("hz-rows");
+  for (const [n, f] of hz) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${n}</td><td class="num">${f} Hz</td><td><span class="hz" style="width:${(f / 740) * 140}px"></span></td>`;
+    tb.appendChild(tr);
+  }
+
+  // ---------- propeller animation: frame camera vs event camera ----------
+  const ce = document.getElementById("cv-ev");
+  const xe = ce.getContext("2d");
+  const W = ce.width, H = ce.height, cx = W / 2, cy = H / 2 + 10, R = 120;
+  const rpm = document.getElementById("rpm"), out = document.getElementById("rpm-out"), btn = document.getElementById("toggle");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let running = !reduce, t = 0, last = performance.now();
+  btn.textContent = running ? "Pause" : "Play";
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  const ON = [138, 184, 245], OFF = [245, 162, 122];
+  const evImg = xe.createImageData(W, H);
+  function drawEvents(freq, dt) {           // events = blade edges crossing pixels during the last few ms
+    const d = evImg.data;
+    for (let i = 0; i < d.length; i += 4) { d[i] *= 0.55; d[i + 1] *= 0.55; d[i + 2] *= 0.55; d[i + 3] = 255; }
+    const a0 = 2 * Math.PI * freq * (t - dt), a1 = 2 * Math.PI * freq * t;
+    for (let n = 0; n < 1400; n++) {
+      const r = 12 + Math.random() * (R - 12), side = Math.random() < 0.5 ? 1 : -1, blade = Math.random() < 0.5 ? 0 : Math.PI;
+      const a = a0 + Math.random() * (a1 - a0) + blade + side * (9 + 4 * (1 - r / R)) / r;
+      const x = Math.round(cx + r * Math.cos(a)), y = Math.round(cy + r * Math.sin(a));
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const col = side > 0 ? OFF : ON, o = (y * W + x) * 4;   // leading edge darkens, trailing edge brightens
+      d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2];
+    }
+    for (let n = 0; n < 40; n++) {                               // sensor noise
+      const o = ((Math.random() * H | 0) * W + (Math.random() * W | 0)) * 4; const c = Math.random() < 0.5 ? ON : OFF;
+      d[o] = c[0] * 0.6; d[o + 1] = c[1] * 0.6; d[o + 2] = c[2] * 0.6;
+    }
+    xe.putImageData(evImg, 0, 0);
+  }
+
+  function frame(now) {
+    const freq = +rpm.value, dt = Math.min((now - last) / 1000, 0.05); last = now;
+    const slow = 1 / 60;                                       // shown 60x slower than real time
+    if (running) t += dt * slow;
+    drawEvents(freq, Math.max(dt * slow, 0.0002));
+    if (running) requestAnimationFrame(frame);
+  }
+  rpm.addEventListener("input", () => { out.textContent = `${rpm.value} rotations/s`; document.getElementById("bp").textContent = 2 * rpm.value; if (!running) frame(performance.now()); });
+  btn.addEventListener("click", () => { running = !running; btn.textContent = running ? "Pause" : "Play"; last = performance.now(); if (running) requestAnimationFrame(frame); });
+  frame(performance.now()); if (running) requestAnimationFrame(frame);
+})();
+</script>
+
+</html>
